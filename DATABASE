@@ -1,4 +1,5 @@
-
+FULL SET UP MYSQL WORKBENCH
+---------------------------------
 -- CUSAT PF app: complete database schema (real employee table + access log).
 -- Run once in MySQL Workbench: File > Run SQL Script.
 
