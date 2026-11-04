@@ -1,1 +1,192 @@
 
+-- CUSAT PF app: complete database schema (real employee table + access log).
+-- Run once in MySQL Workbench: File > Run SQL Script.
+
+-- Real employee master table (103 columns), one row per employee.
+-- Column types are guesses from the field names: check them against the source database (see the README).
+CREATE DATABASE IF NOT EXISTS cusat_pf_portal CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE cusat_pf_portal;
+
+CREATE TABLE IF NOT EXISTS employeemaster (
+    `emp_number` VARCHAR(20) NOT NULL PRIMARY KEY,
+    `auditno` VARCHAR(20),
+    `emp_name` VARCHAR(150),
+    `res_addr1` VARCHAR(100),
+    `res_addr2` VARCHAR(100),
+    `res_addr3` VARCHAR(100),
+    `res_addr4` VARCHAR(100),
+    `con_addr1` VARCHAR(100),
+    `con_addr2` VARCHAR(100),
+    `con_addr3` VARCHAR(100),
+    `con_addr4` VARCHAR(100),
+    `res_phone` VARCHAR(30),
+    `off_phone` VARCHAR(30),
+    `email` VARCHAR(150),
+    `sex` VARCHAR(10),
+    `marital_status` VARCHAR(20),
+    `dob` DATE,
+    `dor` DATE,
+    `father_name` VARCHAR(100),
+    `husband_name` VARCHAR(100),
+    `emp_status` VARCHAR(30),
+    `emp_remarks` TEXT,
+    `payscale` VARCHAR(50),
+    `department_code` VARCHAR(20),
+    `designation_code` VARCHAR(20),
+    `grade_code` VARCHAR(20),
+    `level_code` VARCHAR(20),
+    `category_code` VARCHAR(20),
+    `class_code` VARCHAR(20),
+    `status` VARCHAR(30),
+    `category` VARCHAR(50),
+    `doe` DATE,
+    `doi` DATE,
+    `basic` DECIMAL(12,2),
+    `increment` DECIMAL(12,2),
+    `spl_pay` DECIMAL(12,2),
+    `per_pay` DECIMAL(12,2),
+    `spl_allow` DECIMAL(12,2),
+    `place_of_stay` VARCHAR(100),
+    `date_of_stay_from` DATE,
+    `date_of_stay_to` DATE,
+    `date_of_change` DATE,
+    `qual_school` VARCHAR(100),
+    `ug1` VARCHAR(100),
+    `ug2` VARCHAR(100),
+    `ug3` VARCHAR(100),
+    `pg1` VARCHAR(100),
+    `pg2` VARCHAR(100),
+    `pg3` VARCHAR(100),
+    `other_qual1` VARCHAR(100),
+    `other_qual2` VARCHAR(100),
+    `pan_gir_number` VARCHAR(20),
+    `pran_number` VARCHAR(20),
+    `bank_name` VARCHAR(100),
+    `bank_addr1` VARCHAR(100),
+    `bank_addr2` VARCHAR(100),
+    `bank_addr3` VARCHAR(100),
+    `account_number` VARCHAR(30),
+    `current_el_bal` DECIMAL(7,2),
+    `current_hpl_bal` DECIMAL(7,2),
+    `current_cl_bal` DECIMAL(7,2),
+    `emp_req_no` VARCHAR(50),
+    `uo_ref_no` VARCHAR(50),
+    `dept_ord_no` VARCHAR(50),
+    `enteredby` VARCHAR(50),
+    `verifiedby` VARCHAR(50),
+    `tran_status` VARCHAR(30),
+    `deptdetails` VARCHAR(150),
+    `desgdetails` VARCHAR(150),
+    `gradedetails` VARCHAR(150),
+    `leveldetails` VARCHAR(150),
+    `categroydetails` VARCHAR(150),
+    `classdetails` VARCHAR(150),
+    `payscaledetails` VARCHAR(150),
+    `branch` VARCHAR(100),
+    `location_code` VARCHAR(20),
+    `location_details` VARCHAR(150),
+    `bank_code` VARCHAR(20),
+    `curr_el_bal` DECIMAL(7,2),
+    `curr_el_balf` DECIMAL(7,2),
+    `curr_hpl_bal` DECIMAL(7,2),
+    `lasthpltaken` VARCHAR(30),
+    `lasteltaken` VARCHAR(30),
+    `lasthplaccr` VARCHAR(30),
+    `last_el_els` VARCHAR(30),
+    `leave_rate` DECIMAL(12,2),
+    `otheramount` DECIMAL(12,2),
+    `hra_eligible` VARCHAR(5),
+    `watercharges` DECIMAL(12,2),
+    `pt` DECIMAL(12,2),
+    `username` VARCHAR(50),
+    `date` DATE,
+    `time` VARCHAR(20),
+    `oldbasic` DECIMAL(12,2),
+    `new_basic` DECIMAL(12,2),
+    `div_code` VARCHAR(20),
+    `dor_new` DATE,
+    `pay_type` VARCHAR(30),
+    `nps` VARCHAR(30),
+    `lot_number` VARCHAR(30),
+    `bill_tag` VARCHAR(30),
+    `bill_tag_old` VARCHAR(30),
+    `ifsc` VARCHAR(20),
+    INDEX idx_name (emp_name),
+    INDEX idx_audit (auditno)
+) ENGINE=InnoDB;
+
+-- Login / activity log for the real employees table. Run once, after 01_employees.sql.
+
+CREATE TABLE IF NOT EXISTS access_log (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    pf_no       VARCHAR(20)  NULL,    -- username: the employee number typed or logged in
+    name        VARCHAR(150) NULL,    -- employee name (NULL if the number is unknown)
+    event       ENUM('login_success','login_failed','login_blocked','view','download','logout') NOT NULL,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_pf (pf_no), INDEX idx_time (created_at), INDEX idx_event (event)
+) ENGINE=InnoDB;
+
+-- One row per employee who has logged in.
+CREATE OR REPLACE VIEW logged_in_employees AS
+SELECT e.emp_number, e.emp_name, e.deptdetails, e.desgdetails,
+       COUNT(*) AS total_logins, MIN(l.created_at) AS first_login, MAX(l.created_at) AS last_login
+FROM access_log l
+JOIN employeemaster e ON e.emp_number = l.pf_no
+WHERE l.event = 'login_success'
+GROUP BY e.emp_number, e.emp_name, e.deptdetails, e.desgdetails;
+
+-- SELECT * FROM logged_in_employees ORDER BY last_login DESC;
+-- SELECT created_at, pf_no, name, event FROM access_log ORDER BY id DESC LIMIT 50;
+
+-- Lenient mode for this load only: long or odd values are trimmed with a warning instead of failing the whole INSERT.
+SET SESSION sql_mode = '';
+
+INSERT INTO employeemaster (Emp_number,AuditNo,Emp_name,Res_addr1,Res_addr2,Res_addr3,Res_addr4,Con_addr1,Con_addr2,Con_addr3,Con_addr4,Res_phone,Off_phone,Email,Sex,Marital_status,DOB,DOR,Father_name,Husband_name,Emp_status,Emp_remarks,Payscale,Department_code,Designation_code,Grade_code,Level_code,Category_code,Class_code,status,category,DOE,DOI,Basic,`increment`,Spl_pay,Per_pay,Spl_allow,Place_of_stay,Date_of_stay_from,Date_of_stay_to,Date_of_Change,qual_school,UG1,UG2,UG3,PG1,PG2,PG3,Other_qual1,Other_qual2,Pan_Gir_number,Pran_number,Bank_name,Bank_addr1,Bank_addr2,Bank_addr3,Account_number,Current_EL_bal,Current_Hpl_bal,Current_cl_bal,Emp_req_no,UO_ref_no,Dept_ord_no,Enteredby,Verifiedby,Tran_Status,deptdetails,desgdetails,gradedetails,leveldetails,categroydetails,classdetails,payscaledetails,branch,Location_code,Location_details,bank_code,curr_el_bal,curr_el_balf,curr_hpl_bal,lasthpltaken,lastELTAKEN,lasthplaccr,last_el_els,leave_rate,OtherAmount,HRA_Eligible,Watercharges,pt,username,`date`,`time`,oldbasic,new_basic,div_code,dor_new,pay_type,NPS,lot_number,bill_tag,bill_tag_old,IFSC) VALUES
+	 ('01000',5,'SEBASTIAN OUSEPH','QUARTER NO.A (2)','COCHIN UNIVERSITY CAMPUS','COCHIN UNIVERSITY P.O','KOCHI - 22','VANMELIL HOUSE','PERIAPPURAM P.O.','ERNAKUALM DIST PIN 686 667',NULL,'0484-576320','0485-258453',NULL,'M','M','1958-08-08 00:00:00','2018-08-31 00:00:00',NULL,'TRIXA SEBASTIAN','Confirmed',NULL,22,'01-00','D631','G001','L002A','C043',27,'NON-PLAN','Self-Drawing','1992-05-18 00:00:00','2016-07-01 00:00:00',67000.0,0.0,0.0,10000.0,0.0,'O',NULL,NULL,NULL,'AIHSE','B SC PHYSICS',' ',' ','AICWA',' ',NULL,' ',' ','AACPO6085D',NULL,'STATE BANK OF INDIA','CUSAT BRANCH','KALAMASSERY','XX,XX','57014627853',0.0,0.0,0.0,NULL,'0','','MANAGER','Y','V','01-00   UNIVERSITY ADMINISTRATIVE OFFICE','D631   FINANCE OFFICER','G001   GRADE I','L002  L2 UGC 2006','C043   NON TEACH-OFF-REG-NP','27   CLASS I  L001 ToL003','22   UGC SCALE 2006','CUSAT',1,'','S084',300,0,168,'2017-09-18 00:00:00','2018-08-31 00:00:00','2017-05-17 00:00:00','N',11,0.0,'0',0.0,'N',NULL,NULL,NULL,64610.0,NULL,'23','2018-08-31 00:00:00',NULL,'N',0,0,0,NULL),
+	 ('01607',1003,'DIPAK KUMAR SAHOO','C/O GOPALAKRISHNAN NAIR','VADAKKINADATH HOUSE','EDAVAZHI NAGAR, ELOOR EAST','UDYOGAMANDAL - 683 501','C/O SRI. DASARATHI SAHOO,','RTD. DYSP, "MANORATHA"','DHENKANAL, ORISSA - 759 001',NULL,'0484 - 546397',NULL,'dksahoo@cusat.ac.in','M','M','1966-01-16 00:00:00','2026-04-30 00:00:00',NULL,'SOUBHAGINI SAHOO','Probation',NULL,22,'94-01','D613','G001','L002A','C039',27,'NON-PLAN','Self-Drawing','2001-03-28 00:00:00','2019-07-01 00:00:00',67000.0,0.0,0.0,10000.0,0.0,'Q','2003-06-26 00:00:00',NULL,NULL,'HSC','BSC. ENG CIVIL',' ',' ','M.TEH CIVIL',' ',NULL,' ',' ','AHLPS8166K',NULL,'SBT.CUSAT CAMPUS','COCHIN UNIVERSITY P.O','KOCHI-22','KERALA,INDIA','57014648987',0.0,-3.0,0.0,NULL,'0','DO','MANAGER','Y','V','94-01   CES-SCHOOL OF ENGINEERING','D613   PROFESSOR','G001   GRADE I','L002  L2 UGC 2006','C039   TEACH-REG-VAC-NP','27   CLASS I  L001 ToL003','22   UGC SCALE 2006','COCHIN UNIVERSITY',1,'','S001',193,0,338,'2024-12-06 00:00:00','2024-04-11 00:00:00','2024-03-27 00:00:00','N',11,0.0,'0',265.0,'N',NULL,NULL,NULL,57180.0,NULL,'04','2026-04-30 00:00:00',NULL,'N',0,0,0,NULL),
+	 ('01665',1007,'SAJEEV  R. DR.','CHITRA','AZAD ROAD','KALOOR','KOCHI - 17','RAVINILAYAM','KOONAYIL','PARAVUR P.O.','KOLLAM 691 301','0484-290519','0484-512014','rsajeev@cusat.ac.in','M','M','1964-04-12 00:00:00','2024-04-30 00:00:00',NULL,'DR INDUMATHY K','Probation',NULL,31,'48-00','D934','G001','L007L','C060',41,'NON-PLAN','Self-Drawing','2001-03-20 00:00:00','2020-07-01 00:00:00',181800.0,5500.0,0.0,0.0,0.0,'O',NULL,NULL,NULL,'SSLC','BSC',' ',' ','MSC OCEANOGRAPHY','PH D',NULL,'DIP. IN FORTRAN',' ','AENPR5294N',NULL,'SBT. BROADWAY','BROADWAY','ERNAKULAM','KERALA,','57030082384',0.0,-3.0,0.0,NULL,'UO','DO','MANAGER','Y','V','48-00   DEPT. OF PHYSICAL OCEANOGRAPHY','D934   ASSOCIATE PROFESSOR','G001   GRADE I','L007  UGC SCALE 2016','C060   TEACH-HOD-NON VAC-NP','41   CLASS I  L004 ToL009','31   UGC SCALE 2016','BROADWAY BRANCH',2,'','S002',270,0,302,'2022-06-08 00:00:00','2023-01-01 00:00:00','2022-03-19 00:00:00','N',11,0.0,'0',0.0,'N',NULL,NULL,NULL,49830.0,NULL,'48-00','2024-04-30 00:00:00',NULL,'N',0,0,0,NULL),
+	 ('01063',508,'MAVOOTHU D. DR.','TYPE II, NO:8 QUARTERS','COCHIN UNIVERSITY  P.O.','KOCHI-22',NULL,'S/O DURAIPANDI.P.','SALAIPUDUR, MAVADI.P.O.','PIN - 627 201',NULL,'0484 - 290307','9400076884','mavoothu@rediffmail.com','M','M','1968-03-05 00:00:00','2028-04-30 00:00:00',NULL,'VASANTHI MAVOOTHU','Probation Declared','Regulating by giving 2 incrs.w.e.f.26/03/2008, Rs.14100/- DoI 01/11/08. ',31,'70-01','D927','G001','L008I','C058',41,'NON-PLAN','Self-Drawing','1993-11-03 00:00:00','2020-07-01 00:00:00',182700.0,5500.0,0.0,0.0,0.0,'O',NULL,NULL,NULL,'SSLC','B.COM',' ',' ','M.B.A',' ',NULL,'DIP. IN LABOUR AND ADM. LAWS',' ','ACLPM8901F',NULL,'SBT PERSONAL LOAN','SBT CUSAT CAMPUS','KOCHI - 22','X,X','57014686218',0.0,-3.0,0.0,NULL,'0','DO','MANAGER','Y','V','70-01   SCHOOL OF MANAGEMENT STUDIES','D927   PROFESSOR','G001   GRADE I','L008  UGC SCALE 2016','C058   TEACH-REG-VAC-NP','41   CLASS I  L004 ToL009','31   UGC SCALE 2016','CUSAT BRANCH',1,'','S111',95,9,514,'2024-03-21 00:00:00','2024-06-30 00:00:00','2023-11-02 00:00:00','Y',11,0.0,'0',0.0,'N',NULL,NULL,NULL,46440.0,NULL,'70-01','2028-04-30 00:00:00',NULL,'N',0,0,0,NULL),
+	 ('01366',545,'REJU.V.G.','VANINIRAPPU PUTHENPURAYIL,','KOKKAPPILLY.P.O.,','THIRUVANKULAM VIA,','ERNAKULAM - 682 305','VANINIRAPPU PUTHENPURAYIL,','KOKKAPPILLY.P.O.,','ERNAKULAM - 682 305',NULL,'0484 - 712030','0484 - 712030','reju_vg@cusat.ac.in','M','M','1970-02-02 00:00:00','2002-09-07 00:00:00',NULL,'RASHMI DINESAN','Probation Declared',NULL,1,'78-00','D013','G001','L001A','C001',2,'NON-PLAN','Self-Drawing','1999-05-19 00:00:00','2005-05-01 00:00:00',9925.0,275.0,0.0,0.0,0.0,'O',NULL,NULL,NULL,'SSLC','B.TECH-',' ',' ','M.TECH',' ',NULL,' ',' ','0',NULL,'  CHEQU','SBT','THRIKKAKARA',',','16289',0.0,0.0,0.0,NULL,'0','DO','MGR  ','Y','V','78-00   DEPT. OF INSTRUMENTATION','D013   LECTURER','G001   GRADE-1','L001  UGC LEVEL 1','C001   TEACHING-REG-VAC-NP','2   CLASS - II  L001 ToL001','1   UGC-AICTE SCALE-96','Cheque Payment',1,'','C005',NULL,NULL,NULL,'2004-09-04 00:00:00','2002-10-24 00:00:00',NULL,NULL,11,0.0,'0',0.0,'N',NULL,NULL,NULL,9925.0,NULL,'78-00','2030-04-30 00:00:00',NULL,'N',0,0,0,NULL),
+	 ('01144',552,'MUHAMMED ASLAM DR.','KARINGANAMKODATHU HOUSE','PANAYIKULAM .P.O.','ALANGADU VIA','ERNAKULAM - 683 511','KARINGANAMKODATHU HOUSE','PANAYIKULAM .P.O.','ERNAKULAM - 683 511',NULL,'0484 - 670737',NULL,'aslammoideen@hotmail.com','M','M','1957-01-07 00:00:00','2017-04-30 00:00:00',NULL,'MYMOONA.C.A.','Promoted','PROMOTED AS LECTURER(SELECTION GRADE) W.E.F. 27.07.1998. PAY @ 12000/- SCALE 12000-18300 DNI 01.07.1999. PAY @ 38530/- W.E.F. 01.01.2006. SCALE 37400-67000 DNI 01.07.2006.ADV. INCR. W.E.F. 29.09.2009. PAY @ 49330/- SCALE 37400-67000 DNI 01.07.2010',22,'70-01','D621','G001','L002A','C039',27,'NON-PLAN','Self-Drawing','1995-11-02 00:00:00','2017-07-01 00:00:00',62760.0,2160.0,0.0,9000.0,0.0,'O',NULL,NULL,NULL,'SSLC','BCOM',' ',' ','M.COM','M.PHIL',NULL,' ',' ','ACXPK9444K',NULL,'STATE BANK OF INDIA','CUSAT BRANCH','KALAMASSERY','XX,XX','57014643127',0.0,0.0,0.0,NULL,'0','DO','MANAGER','Y','V','70-01   SCHOOL OF MANAGEMENT STUDIES','D621   ASSOCIATE PROFESSOR','G001   GRADE I','L002  L2 UGC 2006','C039   TEACH-REG-VAC-NP','27   CLASS I  L001 ToL003','22   UGC SCALE 2006','CUSAT',1,'','S084',176,0,155,'2017-01-27 00:00:00','2016-03-05 00:00:00','2016-11-01 00:00:00','Y',11,0.0,'0',0.0,'N',NULL,NULL,NULL,34660.0,NULL,'70-01','2017-04-30 00:00:00',NULL,'N',0,0,0,NULL),
+	 ('01341',566,'ABDU RAHIMAN K.U.DR.','KIZHAKKE KALATHIL','MANNAM P.O.','NORTH PARAVUR','ERNAKULAM DISTRICT 683 520.','KIZHAKKE KALATHIL','MANNAM P.O.','ERNAKULAM DISTRICT 683 520.',NULL,'0484-447501','0484-447501','arku@cusat.ac.in','M','M','1967-11-08 00:00:00','2028-04-30 00:00:00',NULL,'HASEENA N.K.','Promoted','TWO ADV INCR WEF 24/12/2009. BP FIXED AT RS.14100/- WITH DNI ON 01/04/2010.',22,'94-01','D613','G001','L002A','C039',27,'NON-PLAN','Self-Drawing','1999-06-07 00:00:00','2020-07-01 00:00:00',65660.0,0.0,0.0,10000.0,0.0,'O',NULL,NULL,NULL,'SSLC','B TECH CIVIL',' ',' ','M TECH CIVIL',' ',NULL,' ',' ','ACSPA6872A',NULL,'STATE BANK OF INDIA','CUSAT BRANCH','KALAMASSERY','XX,XX','57014643966',0.0,-3.0,0.0,NULL,'0','DO','MANAGER','Y','V','94-01   CES-SCHOOL OF ENGINEERING','D613   PROFESSOR','G001   GRADE I','L002  L2 UGC 2006','C039   TEACH-REG-VAC-NP','27   CLASS I  L001 ToL003','22   UGC SCALE 2006','CUSAT',1,'','S084',178,0,482,'2020-06-06 00:00:00','2024-05-01 00:00:00','2024-06-06 00:00:00','Y',11,0.0,'0',0.0,'N',NULL,NULL,NULL,51440.0,NULL,'05','2028-04-30 00:00:00',NULL,'N',0,0,0,NULL),
+	 ('01342',569,'AJITH KUMAR .G DR.','VISHAKHOM','ARAFA NAGAR','SOUTH KALAMASSERY','COHIN UNIVERSITY.P.O, KOCHI-22','VISHAKHOM','ARAFA NAGAR','COHIN UNIVERSITY.P.O, KOCHI-22',NULL,'0484 - 532639','0484 - 532639','ajithkumar@cusat.ac.in','M','M','1965-06-01 00:00:00','2025-05-31 00:00:00',NULL,'SABITHA. R','Promoted',NULL,22,'94-01','D613','G001','L002A','C039',27,'NON-PLAN','Self-Drawing','1999-06-08 00:00:00','2020-07-01 00:00:00',67000.0,0.0,0.0,10000.0,0.0,'O',NULL,NULL,NULL,NULL,'B.TECH',' ',' ','M.TECH',' ',NULL,' ',' ','AEEPA5465M',NULL,'STATE BANK OF INDIA','CUSAT BRANCH','KALAMASSERY','XX,XX','32538966146',0.0,-3.0,0.0,NULL,'0','DO','MANAGER','Y','V','94-01   CES-SCHOOL OF ENGINEERING','D613   PROFESSOR','G001   GRADE I','L002  L2 UGC 2006','C039   TEACH-REG-VAC-NP','27   CLASS I  L001 ToL003','22   UGC SCALE 2006','CUSAT',1,'','S084',288,0,22,'2025-04-11 00:00:00','2024-05-01 00:00:00','2024-06-07 00:00:00','Y',11,0.0,'0',0.0,'N',NULL,NULL,NULL,55130.0,NULL,'06','2025-06-30 00:00:00',NULL,'N',0,0,0,NULL),
+	 ('01409',585,'DEEPA BALAKRISHNAN S.  DR.','THOTTAVALLIL SREERAGAM','GRACE GARDENS','THRIKKAKARA P O','COCHIN 21','THOTTAVALLIL SREERAGAM','GRACE GARDENS','THRIKKAKARA P O','COCHIN 21','0484- 627581','0479 - 472159','deepa_balu@cusat.ac.in','F','M','1969-01-05 00:00:00','2029-04-30 00:00:00','BALACHANDRAN. N.',NULL,'Promoted','TWO ADV INCR WEF 15/05/2009. PAY FIXED AT RS.13680/- WITH DNI ON 01/09/2009',22,'94-01','D613','G001','L002A','C039',27,'NON-PLAN','Self-Drawing','1999-07-01 00:00:00','2020-07-01 00:00:00',55490.0,0.0,0.0,10000.0,0.0,'O',NULL,NULL,NULL,'SSLC','B.TECH - CIVIL',' ',' ','M.TECH - CIVIL',' ',NULL,'CERT. IN AUTOCAD',' ','AOBPS6290R',NULL,'SBT.CUSAT CAMPUS','COCHIN UNIVERSITY P.O','KOCHI-22','KERALA,INDIA','57014644824',0.0,-3.0,0.0,NULL,'0','DO','MANAGER','Y','V','94-01   CES-SCHOOL OF ENGINEERING','D613   PROFESSOR','G001   GRADE I','L002  L2 UGC 2006','C039   TEACH-REG-VAC-NP','27   CLASS I  L001 ToL003','22   UGC SCALE 2006','COCHIN UNIVERSITY',1,'','S001',183,0,238,'2024-07-10 00:00:00','2024-05-01 00:00:00','2024-06-30 00:00:00','Y',11,0.0,'0',0.0,'N',NULL,NULL,NULL,43250.0,NULL,'05','2029-04-30 00:00:00',NULL,'N',0,0,0,NULL);
+
+SELECT COUNT(*) AS rows_loaded FROM employeemaster;
+SHOW WARNINGS;
+
+-- Monthly salary table
+
+
+CREATE TABLE IF NOT EXISTS salary_monthly (
+    id               BIGINT AUTO_INCREMENT PRIMARY KEY,
+    emp_number       VARCHAR(20)  NOT NULL,          -- same value as employeemaster.emp_number
+    pay_year         SMALLINT     NOT NULL,
+    pay_month        TINYINT      NOT NULL,          -- 1 = Jan ... 12 = Dec
+    basic_pay        DECIMAL(12,2) NULL,
+    da               DECIMAL(12,2) NULL,
+    hra              DECIMAL(12,2) NULL,
+    other_allowances  DECIMAL(12,2) NULL,
+    gross_salary     DECIMAL(12,2) NULL,
+    pf_employee      DECIMAL(12,2) NULL,
+    pf_employer      DECIMAL(12,2) NULL,
+    net_salary       DECIMAL(12,2) NULL,
+    UNIQUE KEY uq_emp_month (emp_number, pay_year, pay_month),
+    INDEX idx_emp (emp_number)
+) ENGINE=InnoDB;
+
+-- Three sample months for employee 01000 so you can see the page working (delete when real data is loaded).
+INSERT IGNORE INTO salary_monthly (emp_number, pay_year, pay_month, basic_pay, da, hra, other_allowances, gross_salary, pf_employee, pf_employer, net_salary) VALUES
+('01000', 2018, 6, 67000.00, 22780.00, 6700.00, 10000.00, 106480.00, 8040.00, 8040.00, 92300.00),
+('01000', 2018, 7, 67000.00, 22780.00, 6700.00, 10000.00, 106480.00, 8040.00, 8040.00, 92300.00),
+('01000', 2018, 8, 67000.00, 22780.00, 6700.00, 10000.00, 106480.00, 8040.00, 8040.00, 92300.00);
+
+-- Admin users
+CREATE TABLE IF NOT EXISTS admin_users (
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    username      VARCHAR(50)  NOT NULL UNIQUE,
+    full_name     VARCHAR(100) NULL,
+    password_hash VARCHAR(255) NOT NULL,        -- never the plain password
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+-- Create the first admin from the command line:  php create_admin.php <username> <password> "<full name>"
